@@ -1,0 +1,32 @@
+{
+  "name": "rideshare-pro",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "mobile"
+  ],
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "scripts": {
+    "start": "npm run start --workspace=@rideshare/mobile",
+    "android": "npm run android --workspace=@rideshare/mobile",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test:mobile && npm run db:test",
+    "test:mobile": "npm run test --workspaces --if-present",
+    "db:test": "node --test scripts/database/database.test.mjs",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset:dev": "supabase db reset --sql-paths ./seed.sql",
+    "db:test:local": "supabase test db supabase/tests/database",
+    "db:lint:local": "supabase db lint",
+    "db:connectivity": "node scripts/check-supabase.mjs",
+    "export:android": "npm run export:android --workspace=@rideshare/mobile",
+    "check:dependencies": "npm run check:dependencies --workspace=@rideshare/mobile",
+    "check": "npm run lint && npm test && npm run check:dependencies && npm run export:android"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.17",
+    "supabase": "^3.2.0"
+  }
+}

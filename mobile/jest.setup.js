@@ -1,0 +1,4 @@
+// Provide native safe-area measurements in the JavaScript test environment.
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
