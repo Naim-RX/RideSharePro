@@ -1,11 +1,13 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, View } from 'react-native';
-import { PasswordField, PrimaryButton, ScreenHeader, TextField } from '../../components';
+import { ErrorMessage, PasswordField, PrimaryButton, ScreenHeader, SecondaryButton, TextField } from '../../components';
 import OptionSelector from '../../components/OptionSelector';
 import Screen from '../../components/Screen';
 import useLocalForm from '../../hooks/useLocalForm';
 import { genderOptions, roleOptions, validateRegistration } from '../../utils/validation';
 import styles from './styles';
+import { useAuth } from '../../context/AuthContext';
+import { toAuthIssue } from '../../services/authErrors';
 
 const initialValues = {
   fullName: '',
@@ -20,8 +22,21 @@ const initialValues = {
 export default function RegistrationScreen({ navigation }) {
   const refs = useRef({});
   const scrollRef = useRef(null);
-  const form = useLocalForm(initialValues, validateRegistration, 'Your details passed the local checks. Account creation is not available yet.');
+  const auth = useAuth();
+  const form = useLocalForm(initialValues, validateRegistration, auth.register);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendError, setResendError] = useState('');
+  async function resend() {
+    if (resending) return;
+    setResending(true);
+    setResendError('');
+    try { setResendMessage(await auth.resendConfirmation(form.values.email)); }
+    catch (error) { setResendError(toAuthIssue(error).message); }
+    finally { setResending(false); }
+  }
   async function submit() {
+    if (resending) return;
     const firstError = await form.submit();
     if (firstError && refs.current[firstError]) refs.current[firstError].focus();
     else if (firstError) {
@@ -32,15 +47,18 @@ export default function RegistrationScreen({ navigation }) {
   function field(name) {
     return {
       value: form.values[name],
-      onChangeText: (value) => form.change(name, value),
+      onChangeText: (value) => {
+        if (name === 'email') { setResendMessage(''); setResendError(''); }
+        form.change(name, value);
+      },
       onBlur: () => form.blur(name),
       error: form.errors[name],
-      editable: !form.submitting,
+      editable: !form.submitting && !resending,
     };
   }
   return (
     <Screen scrollRef={scrollRef}>
-      <ScreenHeader title="Create account" subtitle="Join as a customer or biker." backLabel="Back to login" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Create account" subtitle="Join as a customer or biker." backLabel="Back to login" onBack={form.submitting || resending ? undefined : () => navigation.goBack()} />
       <View style={styles.form}>
         <TextField
           ref={(ref) => { refs.current.fullName = ref; }}
@@ -83,7 +101,7 @@ export default function RegistrationScreen({ navigation }) {
           value={form.values.gender}
           onChange={(value) => { Keyboard.dismiss(); form.change('gender', value); form.blur('gender'); }}
           error={form.errors.gender}
-          disabled={form.submitting}
+          disabled={form.submitting || resending}
         />
         <PasswordField
           ref={(ref) => { refs.current.password = ref; }}
@@ -111,18 +129,22 @@ export default function RegistrationScreen({ navigation }) {
           value={form.values.role}
           onChange={(value) => { Keyboard.dismiss(); form.change('role', value); form.blur('role'); }}
           error={form.errors.role}
-          disabled={form.submitting}
+          disabled={form.submitting || resending}
         />
-        <PrimaryButton title="Create Account" onPress={submit} loading={form.submitting} />
+        <PrimaryButton title="Create Account" onPress={submit} loading={form.submitting} disabled={resending} />
+        <ErrorMessage message={form.error?.message} />
         {form.message ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{form.message}</Text> : null}
+        {form.message ? <SecondaryButton title="Resend confirmation email" onPress={resend} loading={resending} disabled={form.submitting} /> : null}
+        <ErrorMessage message={resendError} />
+        {resendMessage ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{resendMessage}</Text> : null}
       </View>
       <View style={styles.footer}>
         <Text style={styles.footerText}>Already have an account?</Text>
-        <Pressable accessibilityRole="link" onPress={() => navigation.goBack()} style={styles.link}>
+        <Pressable accessibilityRole="link" accessibilityState={{ disabled: form.submitting || resending }} disabled={form.submitting || resending} onPress={() => navigation.goBack()} style={styles.link}>
           <Text style={styles.linkText}>Login</Text>
         </Pressable>
       </View>
-      <Text style={styles.note}>No account will be created during this preview.</Text>
+      <Text style={styles.note}>Your mobile number is stored in your profile. No SMS verification is required.</Text>
     </Screen>
   );
 }

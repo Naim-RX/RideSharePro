@@ -1,13 +1,8 @@
-import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '../../theme';
 
-export default function SplashScreen({ navigation }) {
-  useEffect(() => {
-    const timer = setTimeout(() => navigation.replace('Login'), 1500);
-    return () => clearTimeout(timer);
-  }, [navigation]);
+export default function SplashScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.wordmark}>

@@ -1,13 +1,14 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, processLock } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
 import { validateSupabaseConfig } from './supabaseConfig.mjs';
+import { fetchWithTimeout } from './fetchWithTimeout';
 
 let client;
 let appStateSubscription;
 
-// Lazy: the UI foundation still runs without a configured backend or any network call.
+// A single project-scoped client; credentials are validated only when initialized.
 export function getSupabase() {
   if (client) return client;
   const config = validateSupabaseConfig(
@@ -15,12 +16,13 @@ export function getSupabase() {
     process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   );
   client = createClient(config.url, config.publishableKey, {
+    global: { fetch: fetchWithTimeout },
     auth: {
       storage: AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
-      lock: processLock,
+      // SDK 2.119 coordinates refresh/logout safely by default; legacy locks are deprecated.
     },
   });
   function updateRefresh(state) {
@@ -37,6 +39,7 @@ export function disposeSupabase() {
   appStateSubscription?.remove();
   appStateSubscription = undefined;
   client?.auth.stopAutoRefresh();
+  client?.auth.dispose?.();
   client?.removeAllChannels();
   client = undefined;
 }

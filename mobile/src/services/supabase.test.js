@@ -1,11 +1,11 @@
 import { AppState } from 'react-native';
-import { createClient, processLock } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { afterEach } from '@jest/globals';
 import { getSupabase, disposeSupabase } from './supabase';
 import { validateSupabaseConfig } from './supabaseConfig.mjs';
 
-jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn(), processLock: jest.fn() }));
+jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
@@ -63,7 +63,7 @@ test('creates one persisted client and manages refresh once per application life
   expect(createClient).toHaveBeenCalledTimes(1);
   expect(subscription).toHaveBeenCalledTimes(1);
   expect(createClient.mock.calls[0][2].auth).toEqual({
-    storage: AsyncStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, lock: processLock,
+    storage: AsyncStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false,
   });
   onState('active');
   expect(client.auth.startAutoRefresh).toHaveBeenCalled();
