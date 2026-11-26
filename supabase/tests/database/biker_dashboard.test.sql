@@ -1,0 +1,34 @@
+begin;
+create function public.biker_ok(condition boolean,description text) returns text language plpgsql as $$
+begin if condition is distinct from true then raise exception 'Assertion failed: %',description; end if; return 'ok - '||description; end $$;
+create function public.biker_throws(statement text,description text) returns text language plpgsql as $$
+declare code text; begin begin execute statement; exception when others then code:=sqlstate; end;
+if code is distinct from '42501' then raise exception '%: expected 42501 got %',description,coalesce(code,'success'); end if;
+return 'ok - '||description; end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20000000-0000-4000-8000-000000000001',true);
+select public.biker_ok((select count(*)=0 from public.rides),'available biker cannot read private open-ride rows');
+select public.biker_ok((select count(*)=2 from public.list_biker_rides()),'online biker sees authorized projected requests');
+select public.biker_ok((select not (to_jsonb(r) ? 'customer_id') and not (to_jsonb(r) ? 'request_key') from public.list_biker_rides() r limit 1),'projection excludes customer identity and transaction key');
+select public.biker_ok((select count(*)=1 from public.list_biker_rides(false,(select created_at from public.list_biker_rides() limit 1),(select id from public.list_biker_rides() limit 1))),'keyset pagination advances without repeating first row');
+select public.biker_ok((select count(*)=2 from public.ride_availability_events),'online biker can read minimal availability notifications');
+select public.biker_ok((select count(*)=3 from information_schema.columns where table_schema='public' and table_name='ride_availability_events'),'notification rows contain only ride ID, availability and timestamp');
+select public.biker_ok((select count(*)=1 from public.get_biker_ride('40000000-0000-4000-8000-000000000001')),'online biker can evaluate one open ride');
+select public.biker_ok(not has_function_privilege('authenticated','public.get_biker_route_points(uuid,uuid)','EXECUTE'),'internal route locations are service-only');
+select public.biker_ok(public.submit_bid('40000000-0000-4000-8000-000000000001',123.45)=public.submit_bid('40000000-0000-4000-8000-000000000001',123.45),'repeated bids use one unique record');
+select public.set_biker_availability(false);
+select public.biker_throws('select * from public.list_biker_rides()','offline browsing denied');
+select public.biker_throws($q$select public.submit_bid('40000000-0000-4000-8000-000000000001',120)$q$,'offline bidding denied');
+select public.biker_ok((select count(*)=0 from public.ride_availability_events),'offline biker cannot read availability notifications');
+select public.biker_ok((select count(*)=0 from public.list_biker_rides(true)),'offline biker may read own empty ride history');
+reset role;
+update public.profiles set account_status='suspended' where id='20000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select public.biker_throws('select public.set_biker_availability(true)','suspended biker cannot go online');
+select public.biker_throws($q$select public.submit_bid('40000000-0000-4000-8000-000000000001',120)$q$,'suspended biker cannot bid');
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+select public.biker_throws('select * from public.list_biker_rides()','customer cannot invoke biker discovery');
+set local role anon;
+select public.biker_throws('select * from public.list_biker_rides()','anonymous discovery denied');
+select '1..17';
+rollback;

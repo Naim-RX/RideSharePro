@@ -8,12 +8,19 @@ import LoadingIndicator from '../components/LoadingIndicator';
 import SecondaryButton from '../components/SecondaryButton';
 import AccountScreen from '../screens/account/AccountScreen';
 import AccountAccessScreen from '../screens/account/AccountAccessScreen';
+import CustomerNavigator from './CustomerNavigator';
+import CustomerRoutePreviewScreen from '../screens/customer/CustomerRoutePreviewScreen';
+import CustomerPostRideScreen from '../screens/customer/CustomerPostRideScreen';
+import BikerNavigator from './BikerNavigator';
+import BikerRideDetailsScreen from '../screens/biker/BikerRideDetailsScreen';
+import CustomerBidsScreen from '../screens/customer/CustomerBidsScreen';
+import BikerBidsScreen from '../screens/biker/BikerBidsScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, primary: colors.primary, background: colors.background, card: colors.surface, text: colors.text, border: colors.border } };
-function CustomerAccount() { return <AccountScreen role="customer" />; }
-function BikerAccount() { return <AccountScreen role="biker" />; }
+function CustomerAccount() { return <CustomerNavigator />; }
+function BikerAccount() { return <BikerNavigator />; }
 function AdminAccount() { return <AccountScreen role="admin" />; }
 
 export default function RootNavigator() {
@@ -36,6 +43,12 @@ export default function RootNavigator() {
     <NavigationContainer theme={theme}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
         <Stack.Screen name={`${auth.profile.role}Account`} component={Home} />
+        {auth.profile.role === 'customer' ? <>
+          <Stack.Screen name="CustomerRoutePreview" component={CustomerRoutePreviewScreen} />
+          <Stack.Screen name="CustomerPostRide" component={CustomerPostRideScreen} />
+          <Stack.Screen name="CustomerBids" component={CustomerBidsScreen} />
+        </> : null}
+        {auth.profile.role === 'biker' ? <><Stack.Screen name="BikerRideDetails" component={BikerRideDetailsScreen} /><Stack.Screen name="BikerBids" component={BikerBidsScreen} /></> : null}
       </Stack.Navigator>
     </NavigationContainer>
   );

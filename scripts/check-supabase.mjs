@@ -20,13 +20,13 @@ if (!url || !key) {
       throw new Error('Health RPC failed or migrations are missing. Check the project URL, publishable key, and migration deployment.');
     }
     // The publishable key alone is anonymous. Every app table must reject reads.
-    for (const table of ['profiles', 'biker_profiles', 'rides', 'bids', 'ratings', 'complaints', 'admin_audit_logs']) {
+    for (const table of ['profiles', 'biker_profiles', 'rides', 'bids', 'ratings', 'complaints', 'admin_audit_logs', 'ride_availability_events']) {
       const result = await client.from(table).select('id').limit(1);
       if (!result.error || result.error.code !== '42501') {
         throw new Error(`Anonymous table-access check failed for ${table}.`);
       }
     }
-    console.log('PASS: hosted health RPC and anonymous denial on all seven application tables.');
+    console.log('PASS: hosted health RPC and anonymous denial on all eight application tables.');
   } catch (error) {
     console.error(`FAIL: ${error.message}`);
     process.exitCode = 1;

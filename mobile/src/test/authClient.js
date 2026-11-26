@@ -9,7 +9,10 @@ export function makeAuthClient({ role = 'customer', status = 'active', session: 
   const query = (table) => ({
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn(async () => ({ data: table === 'profiles' ? profile : { id: user.id }, error: null })),
+    in: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    range: jest.fn(async () => ({ data: [], error: null })),
+    maybeSingle: jest.fn(async () => ({ data: table === 'profiles' ? profile : table === 'rides' ? null : { id: user.id }, error: null })),
   });
   const client = {
     user, profile, buildSession,

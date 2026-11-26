@@ -55,13 +55,13 @@ The app role (`customer`, `biker`, `admin`) comes from protected profiles, not e
 | --- | --- | --- | --- |
 | profiles | Own row, including when suspended | Own row, including when suspended | All rows |
 | biker_profiles | No other user's row | Own row, including when suspended | All rows |
-| rides | Own rides while active | Assigned history while active; open requests only while online/available | All rows |
+| rides | Own rides while active | Own assigned rows while active; open discovery through limited projection RPCs while online/available | All rows |
 | bids | Bids on own rides while active | Own bids while active | All rows |
 | ratings | Own ratings while active | Ratings for own completed rides while active | All rows |
 | complaints | Own reports while active | Own reports while active | All rows |
 | audit logs | None | None | All rows |
 
-An eligible biker necessarily receives pickup/destination locations when browsing an open request, along with the customer's UUID. They do not receive the customer's name, mobile, email, or gender through profile reads. Competing bids and other bikers' private details remain hidden.
+Open discovery now returns only ride ID, labels, permitted measurements, expected fare, status and timestamp through `list_biker_rides` / `get_biker_ride`. It excludes customer UUID, transaction key and customer contact/profile information. `ride_availability_events` has only ride ID, availability and timestamp, with RLS allowing available bikers; it supplies Realtime invalidations. Competing bids and other bikers' private details remain hidden. See [biker dashboard](biker-dashboard.md).
 
 `get_bidder_summaries` allows a customer to see display names, motorcycle models, and average ratings only for actual bidders on that customer's ride. It returns no mobile, email, gender, plate, or account-status fields. Complaint targets do not gain access to another person's report.
 

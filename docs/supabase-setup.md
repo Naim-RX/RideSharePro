@@ -2,7 +2,7 @@
 
 ## Current status
 
-The repository is configured, migrations execute in isolated PostgreSQL tests, and RLS remains enabled. No hosted project has been created, linked, or deployed. The Login and Registration screens still validate locally; this phase does not wire them to Auth.
+The repository is configured and RLS remains enabled. A hosted project is now configured through `mobile/.env`, and authentication is connected. See [authentication configuration and verification](authentication.md) for the current flow. This guide remains the procedure for setting up a fresh project; earlier backend verification reports record their original test state.
 
 ## Create a completely new project
 
@@ -61,7 +61,7 @@ const supabase = getSupabase();
 const { data, error } = await supabase.rpc('backend_health');
 ```
 
-Sessions use AsyncStorage, persistence, SDK process locking, and foreground-only auto-refresh. One AppState listener is registered per client; `disposeSupabase()` removes it for application teardown. The client does not detect sessions in URLs automatically. Deep links and the actual authentication UI belong to the next approved Auth integration.
+Sessions use AsyncStorage, persistence, current SDK refresh coordination, and foreground-only auto-refresh. The deprecated processLock option is not used. One refresh listener is registered per SDK client; `disposeSupabase()` removes it for application teardown. The authentication provider separately rechecks profiles on foreground return. The client does not detect sessions in URLs automatically; confirm email in the browser and return to Login manually.
 
 AsyncStorage follows the official React Native setup and handles sessions larger than a small keychain entry. It is app-private storage, **not encrypted storage**. This phase does not claim keychain-backed token encryption. Never log stored sessions or expose device backups containing them.
 
@@ -78,11 +78,15 @@ npx.cmd supabase db push --dry-run --remote
 npx.cmd supabase db push --remote
 ```
 
-Use the CLI's interactive credential handling. Do not put passwords in command arguments, source files, or chat. The dry run should list these three migrations in order:
+Use the CLI's interactive credential handling. Do not put passwords in command arguments, source files, or chat. A fresh project should list these seven migrations in order; an existing linked project lists only pending migrations:
 
 1. `20261120000100_schema.sql`: tables, constraints, indexes, triggers, RLS enablement, and explicit table grants.
 2. `20261120000200_authorization.sql`: private caller-role helpers and row-read policies.
 3. `20261120000300_operations.sql`: restricted business RPCs and the nonsensitive health probe.
+4. `20261124000100_maps_rate_limits.sql`: private, RLS-enabled map request counters and a service-only atomic budget RPC. See [Google Maps deployment and secrets](google-maps.md).
+5. `20261126000100_customer_posting.sql`: permitted Google place-ID storage and customer-only idempotent posting. See [customer posting](customer-posting.md).
+6. `20261126000200_biker_dashboard.sql`: private discovery projections, minimal Realtime publication, protected biker route inputs, and checked bids. See [biker dashboard](biker-dashboard.md).
+7. `20261126000300_fare_bidding.sql`: checked bid comparison/archive projections and bid Realtime publication. See [fare bidding](fare-bidding.md).
 
 Do not include development seed data in a hosted push. Seed execution is disabled in `config.toml`; do not add `--include-seed`. Future schema changes should use a new migration rather than editing a migration already applied to a project.
 
@@ -150,4 +154,4 @@ The placeholder must be replaced with an actual reviewed UUID. Do not repurpose 
 
 ## Verification record
 
-See [backend verification](backend-verification.md) for executed results, and [database design](database.md) for relationships, policies, and RPC contracts. No hosted resource was changed during this phase.
+See the historical [backend verification](backend-verification.md), current [authentication verification](authentication-verification.md), and [database design](database.md) for relationships, policies, and RPC contracts.

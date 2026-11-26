@@ -4,6 +4,7 @@ import { getSupabase } from './services/supabase';
 import { makeAuthClient } from './test/authClient';
 
 jest.mock('./services/supabase', () => ({ getSupabase: jest.fn() }));
+jest.mock('./services/bikerService', () => ({ createBikerService: () => ({ status: async () => ({ is_online:false }), list: async () => [] }), subscribeBiker: () => () => {} }));
 
 test('restores signed-out state and navigates between login and registration', async () => {
   getSupabase.mockReturnValue(makeAuthClient());
@@ -22,6 +23,8 @@ test('database role selects Customer navigation even when metadata claims admini
   await fireEvent.changeText(screen.getByLabelText('Email'), 'test@example.com');
   await fireEvent.changeText(screen.getByLabelText('Password'), 'Secure123');
   await fireEvent.press(screen.getByRole('button', { name: 'Login' }));
+  expect(await screen.findByRole('header', { name: 'Book a ride' })).toBeVisible();
+  await fireEvent.press(screen.getByText('Profile'));
   expect(await screen.findByRole('header', { name: 'Customer account' })).toBeVisible();
   await fireEvent.press(screen.getByRole('button', { name: 'Logout' }));
   expect(await screen.findByRole('button', { name: 'Login' })).toBeVisible();
@@ -33,7 +36,7 @@ test('restored biker session opens only the biker account screen', async () => {
   client.emit('INITIAL_SESSION', client.buildSession());
   getSupabase.mockReturnValue(client);
   await render(<App />);
-  expect(await screen.findByRole('header', { name: 'Biker account' })).toBeVisible();
+  expect(await screen.findByRole('header', { name: 'Available rides' })).toBeVisible();
   expect(screen.queryByRole('header', { name: 'Customer account' })).toBeNull();
 });
 

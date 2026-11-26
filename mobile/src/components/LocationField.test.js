@@ -1,0 +1,34 @@
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import LocationField from './LocationField';
+import { requestMap } from '../services/mapsService';
+jest.mock('../services/mapsService', () => ({ requestMap: jest.fn() }));
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => '10000000-0000-4000-8000-000000000001') }));
+test('debounces autocomplete and terminates the session with selected place details', async () => {
+  jest.useFakeTimers(); const onChange = jest.fn();
+  requestMap.mockResolvedValueOnce({ suggestions: [{ placeId: 'abc', label: 'Campus Gate' }] }).mockResolvedValueOnce({ latitude: 23, longitude: 90, label: 'Campus Gate' });
+  const view = await render(<LocationField label="Pickup" onChange={onChange} />);
+  await fireEvent.changeText(screen.getByLabelText('Pickup'), 'Cam');
+  await act(async () => { jest.advanceTimersByTime(200); });
+  expect(requestMap).not.toHaveBeenCalled();
+  await fireEvent.changeText(screen.getByLabelText('Pickup'), 'Campus');
+  await act(async () => { jest.advanceTimersByTime(350); });
+  await fireEvent.press(screen.getByText('Campus Gate'));
+  expect(requestMap.mock.calls[0][0]).toMatchObject({ action: 'autocomplete', input: 'Campus' });
+  expect(requestMap.mock.calls[1][0]).toMatchObject({ action: 'details', sessionToken: requestMap.mock.calls[0][0].sessionToken });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ latitude: 23, longitude: 90 }));
+  await view.unmount(); jest.useRealTimers();
+});
+test('ignores an old search response after input changes', async () => {
+  jest.useFakeTimers(); requestMap.mockReset();
+  let resolveOld;
+  requestMap.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; })).mockResolvedValueOnce({ suggestions: [{ placeId: 'new', label: 'New address' }] });
+  const view = await render(<LocationField label="Destination" onChange={jest.fn()} />);
+  await fireEvent.changeText(screen.getByLabelText('Destination'), 'Old search');
+  await act(async () => { jest.advanceTimersByTime(350); });
+  await fireEvent.changeText(screen.getByLabelText('Destination'), 'New search');
+  await act(async () => { jest.advanceTimersByTime(350); });
+  await act(async () => { resolveOld({ suggestions: [{ placeId: 'old', label: 'Old address' }] }); });
+  expect(screen.getByText('New address')).toBeVisible();
+  expect(screen.queryByText('Old address')).toBeNull();
+  await view.unmount(); jest.useRealTimers();
+});

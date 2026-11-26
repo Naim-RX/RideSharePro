@@ -2,34 +2,51 @@
 
 ## Current repository
 
-One Expo/React Native JavaScript mobile app, a reserved admin directory, versioned Supabase migrations, development seed data, SQL authorization tests, and setup documentation. The hosted Supabase project has not been created or linked. Existing Login/Registration screens remain local UI previews.
+One Expo/React Native JavaScript mobile application, a reserved admin directory, versioned Supabase migrations, and separate database/authentication tests. The mobile authentication screens are connected to the hosted project configured in ignored mobile/.env.
 
 ## Mobile boundaries
 
-- `App.js` and `index.js`: Expo root, safe-area provider, status bar, and navigator.
-- `src/screens/auth`: Splash, Login, Registration, and form styles.
-- `src/components`: reusable fields, buttons, cards, status/feedback, and confirmation dialog.
-- `src/navigation`: authentication screen navigation.
-- `src/hooks`: local form state and validation lifecycle.
-- `src/utils`: pure local validation and offered gender/role values.
-- `src/theme`: centralized colors, system typography, spacing, dimensions, and borders.
-- `src/services`: reusable lazy Supabase client and public configuration validation.
-- `src/context`: reserved for a future authenticated session provider.
+- `App.js`: Expo root, safe-area provider, status bar, AuthProvider, and RootNavigator.
+- `src/context/AuthContext.js`: subscribes to the authentication controller and foreground events; exposes account actions to screens.
+- `src/services/authController.js`: session/profile state machine, deferred Auth event work, restoration, versioned race guards, and logout.
+- `src/services/authService.js`: normalized email/password registration/login, confirmation resend, server identity verification, and private profile reads.
+- `src/services/authErrors.js`: safe error categories and messages.
+- `src/services/supabase.js`: one validated SDK client, persisted AsyncStorage sessions, foreground refresh, current SDK coordination, bounded network fetches, and teardown.
+- `src/services/fetchWithTimeout.js`: 30-second request cancellation preserving caller signals.
+- `src/navigation`: signed-out authentication stack and role-specific account destinations; stacks are replaced on logout.
+- `src/screens/auth`: Splash, Login, Registration, and shared form styles.
+- `src/screens/account`: minimal authenticated role landing and blocked-account states; no ride/dashboard features.
+- `src/hooks`: local field validation and asynchronous submit/loading/error lifecycle with duplicate-press guard.
+- `src/components`, `src/theme`, and `src/utils`: shared UI, system design tokens, and pure validation.
 
-The SDK client uses AsyncStorage, process locking, and AppState-driven refresh. It is not initialized automatically by the current screens; missing credentials do not break the UI. AsyncStorage is app-private but unencrypted. No secret/service-role credential is included in the client.
+## Identity and roles
 
-## Database boundaries
+Supabase verifies email/password. A trigger creates profiles linked to auth.users atomically, maps only Customer/Biker signup roles, and initializes biker details. Client code never inserts or upserts a profile or authorizes with editable user_metadata.
 
-- `supabase/migrations`: schema/constraints/indexes, RLS/read policies, and checked RPCs in order.
-- `supabase/seed.sql`: explicitly enabled local-development fixture; disabled by default.
-- `supabase/tests/database`: SQL constraints, relationship, permission, and role-isolation tests, rolled back after execution.
-- `scripts/database`: isolated PostgreSQL test runner and test-only Supabase Auth schema/role shim.
-- `scripts/check-supabase.mjs`: explicit hosted/public-key health and anonymous-denial probe.
+A stored session alone does not grant protected navigation. The controller verifies getUser(), loads the protected database profile, checks active status and required profile data, and routes using profiles.role. Suspended/missing/invalid profiles fail closed. Database RLS/RPC checks independently enforce authorization for every protected operation.
 
-The backend has profiles, biker_profiles, rides, bids, ratings, complaints, and admin_audit_logs. RLS is enabled on every exposed table. Client table access is read-only and role-filtered. Business writes go through RPCs that derive the authenticated owner, verify active account/role, and enforce state transitions. Trigger-created profiles allow Customer/Biker signup only; Administrator is trusted-operator provisioned.
+Email-confirmation settings are respected: a null signup session prompts confirmation and manual return to Login; an immediate session is handled automatically when the server allows it. No SMS, OAuth, automatic confirmation deep links, or password-reset feature is implemented.
 
-## Scope limits
+## Persistence and concurrency
 
-No hosted resource is created or modified by the repository tests. PGlite executes real PostgreSQL migrations, constraints, and role policies; it does not run Supabase Auth, PostgREST, or Realtime. Docker is needed for the full official local stack. Auth UI integration, maps/Google Edge Functions, Realtime publication/subscriptions, ride screens, and administrator screens remain later approved work.
+SDK sessions persist in app-private unencrypted AsyncStorage; application code does not store passwords. Auth events, token refresh, and foreground return trigger profile rechecks. Deferred callbacks avoid reentrant SDK work, and generation checks prevent old profile/restore results from resurrecting a logged-out account.
 
-See [database design](database.md), [Supabase setup](supabase-setup.md), [backend verification](backend-verification.md), and [UI contracts](ui-foundation.md).
+Local-scope logout removes this device's SDK session, verifies persisted state is empty, and does not claim server revocation succeeded if offline. A failed local cleanup remains blocked. Current SDK refresh coordination replaces the deprecated custom process lock. Network requests are bounded and cancelled rather than merely raced against a timeout.
+
+## Database and verification
+
+The three existing migrations define schema, constraints, indexes, RLS/read policies, trusted signup initialization, and checked RPCs. No RLS policy was weakened for authentication. SQL tests run in isolated PostgreSQL; live authentication tests require owned test accounts and a configured hosted project. Live tests print no credentials and restore test metadata after escalation checks.
+
+See [authentication](authentication.md), [authentication verification](authentication-verification.md), [database design](database.md), and [Supabase setup](supabase-setup.md). Assignment UI and full admin functionality remain later approved work.
+
+## Biker dashboard
+
+`BikerNavigator` supplies Home/History/Profile and the root stack supplies Ride Details. `bikerService` owns checked availability, vehicle, discovery, detail and bid operations. Open-ride data comes from limited projection RPCs, not raw ride SELECT. A session-bound, focused Realtime subscription consumes minimal availability notifications and the caller's own profile changes, debounces invalidations, re-queries authorized data and removes channels on blur. The server resolves ride-specific Google route inputs for active available bikers. No assignment or tracking operation is added. See [biker dashboard](biker-dashboard.md).
+
+## Bid comparison and status
+
+`bidService` reads checked customer comparison and biker archive projections and owns ride-/biker-filtered bid subscriptions. Customer Home opens `CustomerBidsScreen`; biker Home opens `BikerBidsScreen`. Realtime invalidations, join/reconnect and foreground return refetch authorized data. Shared BidCards display real ratings and fare/status without a selection action. Database uniqueness and ride-first transaction locks serialize bid creation/revision against closure. See [fare bidding](fare-bidding.md).
+
+## Maps preview boundary
+
+Customer navigation includes Home/History/Profile tabs and a preview/posting stack. `LocationField` owns autocomplete sessions; `mapsService` invokes the protected Google Edge Function. `RouteMap`/`RouteSummary` share map presentation. Google addresses, coordinates, geometry and estimates stay in memory. `rideService` saves permitted place IDs, customer-entered labels, mode and fare via the customer-only RPC, with a per-account durable pending request. PostgreSQL derives ownership, serializes posting, rejects changed-payload replay, and enforces RLS and one active ride. See [customer posting](customer-posting.md) and [maps setup](google-maps.md).
